@@ -81,12 +81,14 @@ int main(s32 Argc, char **Argv){
     LongConverter(*(++Argv), &Seed);
     LongConverter(*(++Argv), &Count);
 
+    printf("Seed used: %lx\n", Seed);
 
     f64 Bench = 0;
     f64 Den = sqrt((f64)Count);
     srand(Seed);
     
-    const s64 JsonBufSz = JSONSTRINGBYTES * Count;
+    /* 100 bytes extra assumed for json wrapper text */
+    const s64 JsonBufSz = (JSONSTRINGBYTES * Count) + 100;
     const s64 BinBufSz = sizeof(f64) * (Count + 1);
 
     /* requesting huge mmaped regions to write into */
@@ -131,8 +133,10 @@ int main(s32 Argc, char **Argv){
         ExitProg("File failed to open");
     
     /* remember that 0ffset is always 1 past the last written byte */
-    fwrite(BinBuffer, sizeof(f64), BinOffset-BinBuffer, RBin);
-    fwrite(JsonBuffer, sizeof(char), JsonOffset-JsonBuffer, FJson);
+    s64 BinWritten = fwrite(BinBuffer, sizeof(f64), BinOffset-BinBuffer, RBin);
+    s64 JsonWritten = fwrite(JsonBuffer, sizeof(char), JsonOffset-JsonBuffer, FJson);
+
+    if(BinWritten != (BinOffset-BinBuffer) || JsonWritten != (JsonOffset-JsonBuffer)) ExitProg("File write error\n");
    
 
     /* clean up shop */
