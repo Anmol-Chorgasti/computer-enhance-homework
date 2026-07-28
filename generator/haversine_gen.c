@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 #define XB -180
 #define XE 180
@@ -43,18 +45,50 @@ s64 WriteJson(f64 X0, f64 Y0, f64 X1, f64 Y1, char *Offset, s32 flag){
     return bytes;
 }
 
+void ExitProg(char *Message){
+    printf("%s\n", Message);
+    exit(EXIT_FAILURE);
+}
+
+void LongConverter (char *Value, s64 *Number){
+    errno = 0;
+    char *EndPtr;
+    *Number = strtol(Value, &EndPtr, 0);
+    if(*EndPtr != '\0') ExitProg("Invalid count or seed input");
+    if(errno == EINVAL) ExitProg("Format not supported by base 10 when converting to long");
+    if(errno == ERANGE && (*Number) == LONG_MIN) ExitProg("Input value out of range - underflow");
+    if(errno == ERANGE && (*Number) == LONG_MAX) ExitProg("Input value out of range - overflow");
+}
+
+/* 
+    The parameter values for mmap are fixed at a program level
+    This function acts as a wrapper to ensure errno stays at 0 even after
+    a mmap call, as if not, it exits the program.
+
+*/
+void* RequestMemory(size_t Size){
+    void *ptr;
+    ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
+    return ptr;
+}
 
 int main(s32 Argc, char **Argv){
 
-    s64 Seed = strtol(*(++Argv), NULL, 0);
-    s64 Count = strtol(*(++Argv), NULL, 0);
+    if(Argc != 3) ExitProg("Not enough arguments");
+
+    s64 Seed, Count;
+    LongConverter(*(++Argv), &Seed);
+    LongConverter(*(++Argv), &Count);
+
+
     f64 Bench = 0;
     f64 Den = sqrt((f64)Count);
     srand(Seed);
 
     /* requesting huge mmaped regions to write into */
-    char *JsonBuffer = mmap(NULL, JSONSTRINGBYTES*Count, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    f64 *BinBuffer = mmap(NULL, sizeof(f64)*Count, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    char *JsonBuffer = (char *)RequestMemory(JSONSTRINGBYTES*Count);
+    f64 *BinBuffer = (f64 *)RequestMemory(sizeof(f64)*(Count+1));
     char *JsonOffset = JsonBuffer;
     f64 *BinOffset = BinBuffer;
 
@@ -82,6 +116,8 @@ int main(s32 Argc, char **Argv){
     Bench = Bench / Den;
      /* Print average for me to check */
     printf("Statistical Bench Mark : %.17g\n", Bench);
+    WriteBinary(BinOffset, &Bench);
+    BinOffset += 1;
 
     /* flush into the files - pending */
     FILE *FJson = fopen("input.json", "w");
@@ -102,7 +138,7 @@ int main(s32 Argc, char **Argv){
 
 /*
     add in exit mechanisms, and failsafes
+    - WRITE final statistical benchmark into the binary file
     - how to exit early if no command line terminals provided
     - how to exit if os does not oblige with mmap requests
-
 */
