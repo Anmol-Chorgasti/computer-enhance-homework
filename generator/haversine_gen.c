@@ -85,10 +85,13 @@ int main(s32 Argc, char **Argv){
     f64 Bench = 0;
     f64 Den = sqrt((f64)Count);
     srand(Seed);
+    
+    const s64 JsonBufSz = JSONSTRINGBYTES * Count;
+    const s64 BinBufSz = sizeof(f64) * (Count + 1);
 
     /* requesting huge mmaped regions to write into */
-    char *JsonBuffer = (char *)RequestMemory(JSONSTRINGBYTES*Count);
-    f64 *BinBuffer = (f64 *)RequestMemory(sizeof(f64)*(Count+1));
+    char *JsonBuffer = (char *)RequestMemory(JsonBufSz);
+    f64 *BinBuffer = (f64 *)RequestMemory(BinBufSz);
     char *JsonOffset = JsonBuffer;
     f64 *BinOffset = BinBuffer;
 
@@ -120,8 +123,12 @@ int main(s32 Argc, char **Argv){
     BinOffset += 1;
 
     /* flush into the files - pending */
-    FILE *FJson = fopen("input.json", "w");
-    FILE *RBin = fopen("results.bin", "wb");
+    FILE *FJson = NULL;
+    if ((FJson = fopen("build/input.json", "w")) == NULL)
+        ExitProg("File failed to open");
+    FILE *RBin = NULL;
+    if ((RBin = fopen("build/results.bin", "wb")) == NULL)
+        ExitProg("File failed to open");
     
     /* remember that 0ffset is always 1 past the last written byte */
     fwrite(BinBuffer, sizeof(f64), BinOffset-BinBuffer, RBin);
@@ -129,16 +136,15 @@ int main(s32 Argc, char **Argv){
    
 
     /* clean up shop */
-    munmap(JsonBuffer, JSONSTRINGBYTES*Count);
-    munmap(BinBuffer, sizeof(f64)*Count);
+    munmap(JsonBuffer, JsonBufSz);
+    munmap(BinBuffer, BinBufSz);
     fclose(FJson); fclose(RBin);
     JsonBuffer = NULL; JsonOffset = NULL; 
     BinBuffer = NULL; BinOffset = NULL;
 }
 
 /*
-    add in exit mechanisms, and failsafes
-    - WRITE final statistical benchmark into the binary file
-    - how to exit early if no command line terminals provided
-    - how to exit if os does not oblige with mmap requests
+    Thoughts
+    - the bench does not vary too much across different seeds, around 100-200
+      hopefully that is enough variance to go ahead with this assignment
 */

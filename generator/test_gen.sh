@@ -1,10 +1,12 @@
 
 set -euo pipefail
+# Force creation of the build directory if it doesn't exist
+mkdir -p build
 
 echo "Compiling with Clang..."
-clang -g -Wall -Wextra -Werror -fsanitize=address,undefined haversine_gen.c -o havgen -lm
+clang -g -Wall -Wextra -Werror -fsanitize=address,undefined haversine_gen.c -o build/havgen -lm
 
 echo "Compiling with GCC..."
-gcc -g -Wall -Wextra -Werror -fsanitize=address,undefined haversine_gen.c -o havgen -lm
+gcc -g -Wall -Wextra -Werror -fsanitize=address,undefined haversine_gen.c -o build/havgen -lm
 
 echo "Build successful!"
