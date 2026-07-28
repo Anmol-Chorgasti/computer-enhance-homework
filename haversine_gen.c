@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
-#include "../haversine_fun.c"
+#include "haversine_fun.c"
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
@@ -55,7 +55,7 @@ void LongConverter (char *Value, s64 *Number){
     char *EndPtr;
     *Number = strtol(Value, &EndPtr, 0);
     if(*EndPtr != '\0') ExitProg("Invalid count or seed input");
-    if(errno == EINVAL) ExitProg("Format not supported by base 10 when converting to long");
+    if(errno == EINVAL) ExitProg("base value unsupported");
     if(errno == ERANGE && (*Number) == LONG_MIN) ExitProg("Input value out of range - underflow");
     if(errno == ERANGE && (*Number) == LONG_MAX) ExitProg("Input value out of range - overflow");
 }
@@ -151,4 +151,7 @@ int main(s32 Argc, char **Argv){
     Thoughts
     - the bench does not vary too much across different seeds, around 100-200
       hopefully that is enough variance to go ahead with this assignment
+    - early termination IS possible by checking snprintf, but for now using
+      a simple final check for fwrite is sufficient given that I am the one
+      generating the executable inputs.
 */
