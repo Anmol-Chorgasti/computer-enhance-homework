@@ -12,3 +12,6 @@ echo "Compiling with GCC..."
 gcc -g -Wall -Wextra -Werror -fsanitize=address,undefined haversine_parser.c -o build/havpar -lm
 
 echo "Build successful!"
+
+echo "Executing Parser..."
+build/havpar build/input.json build/results.bin

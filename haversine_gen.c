@@ -41,7 +41,7 @@ void WriteBinary(f64 *Memptr, f64 *Value){
 */
 s64 WriteJson(f64 X0, f64 Y0, f64 X1, f64 Y1, char *Offset, s32 flag){
     
-    s64 bytes = snprintf(Offset, JSONSTRINGBYTES, "{\"x0\":%.17g, \"y0\":%.17g, \"x1\":%.17g, \"y1\":%.17g}%s\n", X0, Y0, X1, Y1, (flag) ? "" : ",");
+    s64 bytes = snprintf(Offset, JSONSTRINGBYTES, "{\"x0\":%.12f, \"y0\":%.12f, \"x1\":%.12f, \"y1\":%.12f}%s\n", X0, Y0, X1, Y1, (flag) ? "" : ",");
     return bytes;
 }
 
@@ -120,11 +120,11 @@ int main(s32 Argc, char **Argv){
 
     Bench = Bench / Den;
      /* Print average for me to check */
-    printf("Statistical Bench Mark : %.17g\n", Bench);
+    printf("Statistical Bench Mark : %.12f\n", Bench);
     WriteBinary(BinOffset, &Bench);
     BinOffset += 1;
 
-    /* flush into the files - pending */
+    /* flush into the files */
     FILE *FJson = NULL;
     if ((FJson = fopen("build/input.json", "w")) == NULL)
         ExitProg("File failed to open");

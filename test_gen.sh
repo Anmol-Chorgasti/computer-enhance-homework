@@ -16,4 +16,4 @@ echo "Build successful!"
 
 
 echo "Executing generator..."
-build/havgen $RANDOM 1000
+build/havgen $RANDOM 10000000
