@@ -205,7 +205,7 @@ s32 ParseBuffer(struct Pairs *HPtr){
                 continue;
             }
             f64 Coordinate = GetDouble(&Current, Limit);
-            if (Coordinate == JSONSTRINGBYTES){
+            if (Coordinate == INVALIDJSON){
                 CorruptBuffer = 1;
                 return -1;
             }
@@ -223,6 +223,11 @@ s32 ParseBuffer(struct Pairs *HPtr){
         }
 
         Current += 1;
+    }
+
+    if (DoublesParsed != 3) {
+        DoubleErrFlag = 1;
+        return -1;
     }
 
     /* If here, two invariants true - 4 doubles parsed, all doubles valid */
