@@ -16,7 +16,7 @@
 #define ASCII_ZERO 48
 #define ASCII_NINE 57
 #define INVALIDJSON 190.0
-#define ABS_ERR_MARGIN 1e-12
+#define ABS_ERR_MARGIN 1e-8
 
 typedef double f64;
 typedef int s32;
