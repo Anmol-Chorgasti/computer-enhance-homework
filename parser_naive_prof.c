@@ -88,7 +88,7 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
 
 void* RequestMemory(size_t Size){
     void *ptr;
-    ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
     if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
     return ptr;
 }
