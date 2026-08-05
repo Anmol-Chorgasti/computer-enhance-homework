@@ -2,7 +2,7 @@
 #include <sys/mman.h>
 #define CPU_FREQ_LIMIT "2"
 #define CPU_FREQ_UNIT "sec"
-#define LIMIT 1000
+#define LIMIT 4096
 
 /* A tree node 
     Created when we call TimeFunction / TimeBlock
@@ -12,25 +12,34 @@
     on exit, gcc calls end timer immediately, stores it in node, pops stack top (just decrement stackTop by 1, to point
     to the prev index.
 */
-struct PrNode {
-    struct PrNode *Children[LIMIT];
+struct Anchor {
     const char *Name;
-    u64 StartTime;
-    u64 EndTime;
-    u32 CurrChildIdx;  //always points to the CURRENT FREE Index to insert a child node ptr in.
+    u64 TotElapsed;
+    u64 TSCChldrenElapsed;
+    u64 HitCount; //can use this to check if hit count is 
+    u64 Frames;
 };
 
 
 struct Profiler {
-    struct PrNode *Stack[LIMIT];
-    struct PrNode *Root; /* Points to the base of the Mmaped region as well as the root node */
-    struct PrNode *MmapLimit;
+    struct Anchor Anchors[LIMIT];
+    u64 AnchorIdx;
     u64 TSCFreq;
-    u32 StackTop;
+    u64 StartTime;
+    u64 EndTime;
 };
 
-static struct Profiler Pr = {}; /* Global variable due to many functions internally relying on it */
-static int Count = 0; /* this keeps track of how many blocks or functions we have profiled */
+struct FrameDetails {
+    u64 CallingParent;
+    u64 CallingTime;
+    struct Anchor *A;
+};
+
+static struct Profiler Pr; /* Static takes care of zero initialization for all members of Pr */
+static u64 GlobalParentIdx = 0; /* 0 signals no parent open, Casey style thinking */
+static u64 RecCount = 0;
+
+/* Figure our recursion and loops later */
 
 void ExitProg(char *Message){
     printf("%s\n", Message);
@@ -43,52 +52,15 @@ void PrintTime(char *Message, u64 Start, u64 End, u64 TSCF){
     printf("---------------------------\n");
 }
 
-void PrintTree(struct PrNode *Node, int Depth, u64 Base){
-    /* if Depth is a 1000 layers deep..no screen will be able to handle this print out..
-       is it safe to say though that trying to profile something so nested in general is a bad habit?
-    */
-    for(int i = 0; i < Depth; i++)
-        printf(" ");
-    u64 Elapsed = Node->EndTime - Node->StartTime;
-    printf("%s : %ld (elapsed) (%.2f%%)\n", Node->Name, Elapsed, 100 * ((f64)Elapsed/(f64)Base));
-
-    // Recursive calls
-    for(int i = 0; i < Node->CurrChildIdx; ++i){
-        PrintTree(Node->Children[i], Depth+1, Base);
-    }
-    return;
-}
-
-void PrintTimeTree(struct PrNode *Node, int Depth, u64 Base, u64 TSCF){
-    /* if Depth is a 1000 layers deep..no screen will be able to handle this print out..
-       is it safe to say though that trying to profile something so nested in general is a bad habit?
-    */
-    
-    for(int i = 0; i < Depth; i++)
-       printf(" ");
-    
-    u64 Elapsed = Node->EndTime - Node->StartTime;
-    printf("%s Time: %.2f seconds, %.2f milliseconds, (%.2f%%)\n", Node->Name, (f64)(Elapsed)/(f64)TSCF, 1000 * ((f64)(Elapsed)/(f64)TSCF), 100 * ((f64)Elapsed/(f64)Base));
-
-    // Recursive calls
-    for(int i = 0; i < Node->CurrChildIdx; ++i){
-        PrintTimeTree(Node->Children[i], Depth+1, Base, TSCF);
-    }
-    return;
-}
-
-/* If success, returns a warmed up memory, avoiding PAGE FAULT cost later */
-void* RequestMemory(size_t Size){
-    void *ptr;
-    ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-    if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
-    return ptr;
-}
-
-void FreeMemory(void *Root, size_t Size){
-    int n = munmap(Root, Size);
-    if(!n) return;
-    ExitProg("Failed to free Memory. TERMINATING PROGRAM");
+void PrintElapsed(struct Anchor *APtr, u64 Base){
+    /* print name, exclusive elapsed and total elapsed */
+    if (APtr->TSCChldrenElapsed) 
+        printf("%s[%lu] :- Exclusive = %lu(elapsed) (%.2f%%), Total = %lu(elapsed) (%.2f%%)\n", APtr->Name, APtr->HitCount,
+        APtr->TotElapsed - APtr->TSCChldrenElapsed, 100 * ((f64)(APtr->TotElapsed - APtr->TSCChldrenElapsed)/(f64)Base),
+        APtr->TotElapsed, 100*((f64)(APtr->TotElapsed)/(f64)Base));
+    else
+        printf("%s[%lu] :- %lu(elapsed) (%.2f%%)\n", APtr->Name, APtr->HitCount,
+        APtr->TotElapsed, 100 * (f64)(APtr->TotElapsed)/(f64)Base);
 }
 
 #define BeginProfiler StartProfiler()
@@ -96,79 +68,95 @@ void FreeMemory(void *Root, size_t Size){
 // Initialize Profiler
 __attribute__((always_inline)) inline static void StartProfiler(){
     Pr.TSCFreq = ReadCPUFreq(CPU_FREQ_UNIT, CPU_FREQ_LIMIT);
-    Pr.Root = (struct PrNode *)RequestMemory(sizeof(struct PrNode)*LIMIT);
-   
-    Pr.MmapLimit = Pr.Root + (LIMIT); // Points to the LAST valid address in the mmapped region
-    Pr.Stack[0] = Pr.Root;
-    Pr.Root->StartTime = ReadCPUTimer();
-    Pr.StackTop = 0; //points to current active running block of code
+    /* What do I need here? */
+    Pr.StartTime = ReadCPUTimer();
 }
 
 #define EndProfiler EndAndPrintProfiler()
 // Kind of Destroy Profiler 
 __attribute__((always_inline)) inline static void EndAndPrintProfiler(){
 
-    Pr.Root->EndTime = ReadCPUTimer();
-    Pr.Root->Name = "Root";
+    Pr.EndTime = ReadCPUTimer();
+    struct Anchor *Others = &Pr.Anchors[0];
 
-    u64 MainElapsed = Pr.Root->EndTime - Pr.Root->StartTime;
-    PrintTime("Full Program",Pr.Root->StartTime, Pr.Root->EndTime, Pr.TSCFreq); // prints entire running time of program
-    PrintTree(Pr.Root, 0, MainElapsed);
+    u64 MainElapsed = Pr.EndTime - Pr.StartTime;
+    PrintTime("Full Program",Pr.StartTime, Pr.EndTime, Pr.TSCFreq); // prints entire running time of program
 
-    u64 ChildrenCost = 0;
-    for(int i = 0; i < Pr.Root->CurrChildIdx; ++i){
-        ChildrenCost += (Pr.Root->Children[i]->EndTime - Pr.Root->Children[i]->StartTime);
+    for(int i = 1; i <= Pr.AnchorIdx; ++i){
+        PrintElapsed(&Pr.Anchors[i], MainElapsed);
     }
-    s64 Balance = (MainElapsed - ChildrenCost);
-    if(Balance >= 0) 
-        printf("\nOther : %ld(elapsed) (%.2f%%)\n\n", Balance, 100 * ((f64)Balance/(f64)MainElapsed));
-    else ExitProg("Profiler math is not mathing");
 
-    printf("\n---------------------------------\n");
+    printf("Other[1] :- %lu(elapsed) (%.2f%%)\n",
+        MainElapsed - Others->TSCChldrenElapsed, 100 * (f64)(MainElapsed - Others->TSCChldrenElapsed)/(f64)MainElapsed);
+}
+
+
+__attribute__ ((always_inline)) inline static void CleanUp(struct FrameDetails *FPtr){
+   
+    u64 Cost = ReadCPUTimer() - FPtr->CallingTime; // THe entire duration this frame was open for
+    u64 Parent = FPtr->CallingParent;
+    GlobalParentIdx = Parent;
     
-    PrintTimeTree(Pr.Root, 0, MainElapsed, Pr.TSCFreq);
-
-    printf("\n%d blocks profiled.\n", Count+1);
-    // Free memory
-    FreeMemory(Pr.Root, sizeof(struct PrNode)*LIMIT);
-    Pr.Root = Pr.MmapLimit = NULL;
-    Pr.Stack[0] = NULL;
-    Pr.StackTop = 0;
+    FPtr->A->TotElapsed += Cost; // this cost gets added to the Anchor of this frame
+    Pr.Anchors[Parent].TSCChldrenElapsed += Cost; // the parent of this frame gets the cost added to its children cost
 }
 
-/* 
-   The profiler does not have defensive checks baked into it, 
-   so adding those in could further inflate the costs.
-*/
-__attribute__ ((always_inline)) inline static void CleanUp(struct PrNode **NodePtr){
-    (*NodePtr)->EndTime = ReadCPUTimer(); //let this be the FIRST thing that happens
-
-    // move stack top back by 1 as this node is POPPED off
-    Pr.StackTop = (Pr.StackTop > 0) ? (Pr.StackTop - 1) : 0; 
-
-    //Add this node to the children of the parent node - the one that called this Node
-    struct PrNode *Parent = Pr.Stack[Pr.StackTop];
-    Parent->Children[Parent->CurrChildIdx] = (*NodePtr);
-    Parent->CurrChildIdx += 1;
+__attribute__ ((always_inline)) inline static void CleanRecUp(struct FrameDetails *FPtr){
+   // IF WE are on last frame, 
+   /*
+        We can dump the exclusive costs into the parent's child cost
+        ON THE LAST FRAME.
+        and also reset globalparentidx to the actual parent!
+   */
+    FPtr->A->Frames -= 1;
+    RecCount -= 1;
+    u64 Parent = FPtr->CallingParent;
+    GlobalParentIdx = Parent;
+    if(FPtr->A->Frames == 0){    
+        u64 Cost =  ReadCPUTimer() - FPtr->CallingTime; 
+        // the first frame of a recursive fun, how long was this open for? that's the total cost of this anchor
+        FPtr->A->TotElapsed += Cost;
+        Pr.Anchors[Parent].TSCChldrenElapsed += Cost;
+    }
+    
 }
 
-#define TimeFunction \
-        Count += 1; \
-        struct PrNode *Node __attribute__((cleanup(CleanUp))) = Pr.Root + Count; \
-        Pr.StackTop += 1; \
-        Pr.Stack[Pr.StackTop] = Node; \
-        Node->Name = __func__; \
-        Node->CurrChildIdx = 0; \
-        Node->StartTime = ReadCPUTimer(); \
+u64 GetIndex(const char *BName){
+    for(int i = Pr.AnchorIdx; i > 0; i--){
+        if(Pr.Anchors[i].Name == BName) return i;
+    }
+    Pr.AnchorIdx += 1;
+    return Pr.AnchorIdx;
+}
+
+#define TimeFunction TimeBlock(__func__)
 
 #define TimeBlock(BlockName) \
-        Count += 1; \
-        struct PrNode *Node __attribute__((cleanup(CleanUp))) = Pr.Root + Count; \
-        Pr.StackTop += 1; \
-        Pr.Stack[Pr.StackTop] = Node; \
-        Node->Name = BlockName; \
-        Node->CurrChildIdx = 0; \
-        Node->StartTime = ReadCPUTimer(); \
+        u64 Idx = 0; \
+        if(RecCount) Idx = GetIndex(BlockName); \
+        else Idx = (Pr.AnchorIdx += 1); \
+        struct FrameDetails Fd __attribute__((cleanup(CleanUp))); \
+        Fd.CallingParent = GlobalParentIdx; \
+        Fd.A = &Pr.Anchors[Idx]; \
+        Fd.A->Name = BlockName; \
+        Fd.A->HitCount += 1; \
+        struct Anchor *T = &Pr.Anchors[GlobalParentIdx]; \
+        GlobalParentIdx = Idx; \
+        Fd.CallingTime = ReadCPUTimer(); \
 
+#define TimeRecFunc(BlockName) \
+        u64 Idx = GetIndex(BlockName); \
+        struct FrameDetails F  __attribute__((cleanup(CleanRecUp))); \
+        F.CallingParent = GlobalParentIdx; \
+        F.A = &Pr.Anchors[Idx]; \
+        F.A->Name = BlockName; \
+        F.A->HitCount += 1; \
+        F.A->Frames += 1; \
+        struct Anchor *T = &Pr.Anchors[GlobalParentIdx]; \
+        GlobalParentIdx = Idx; \
+        RecCount += 1; \
+        F.CallingTime = ReadCPUTimer(); \
+        
+        
 
 

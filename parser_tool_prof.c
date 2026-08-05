@@ -56,6 +56,13 @@ void PrintPair(struct Pairs *HPtr){
     printf("Y1 : %.12f\n\n", HPtr->Y1);
 }
 
+void* RequestMemory(size_t Size){
+    void *ptr;
+    ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+    if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
+    return ptr;
+}
+
 void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
     struct stat st;
     if( fstat(FD, &st) < 0 )
@@ -68,7 +75,7 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
         ExitProg("Empty file forces termination of program.");
 
     void *Ptr = NULL;
-    Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED, FD, 0);
+    Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED | MAP_POPULATE, FD, 0);
 
     if (Ptr == MAP_FAILED){
         printf("%s...", FileName);

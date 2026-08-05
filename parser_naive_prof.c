@@ -76,7 +76,7 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
         ExitProg("Empty file forces termination of program.");
 
     void *Ptr = NULL;
-    Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED, FD, 0);
+    Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED | MAP_POPULATE, FD, 0);
 
     if (Ptr == MAP_FAILED){
         printf("%s...", FileName);
