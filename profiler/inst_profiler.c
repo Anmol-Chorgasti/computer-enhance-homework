@@ -24,7 +24,7 @@ struct FrameDetails {
     u32 CallingParent;
     u64 CallingTime;
     u32 AnchorIdx;
-    u32 OldTscInclusive;
+    u64 OldTscInclusive;
 };
 
 static struct Profiler Pr; /* Static takes care of zero initialization for all members of Pr */
