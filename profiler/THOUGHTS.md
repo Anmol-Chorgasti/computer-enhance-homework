@@ -90,7 +90,11 @@ We check the value of X and the value of Y, and the magic ratio Z is then `(Val 
 
 Now if we know this ratio, we have a multiplier that we can use to convert X's value to Y's value! If I say, *"Hey, B ran 200 meters. If A was running, how much do you think A would have run for?"* I know that for every meter A covers, B covers two, so it must be that A has probably covered half the distance—so A's value is probably 100 meters.
 
-Now we have Y's value and its frequency; therefore, we have a way to get the time. That's what `clock_gettime` does for us. It takes X's value, uses the magic ratio Z that the kernel was kind enough to store at some memory location for us, converts X's value to Y's value, uses Y's known frequency, and gives us back the time!
+Now we have Y's value and its frequency; therefore, we have a way to get the time. That's what `clock_gettime` does for us MATHEMATICALLY. It takes X's value, uses the magic ratio Z that the kernel was kind enough to store at some memory location for us, converts X's value to Y's value, uses Y's known frequency, and gives us back the time! Though in reality multiplying by the magic ratio itself gets us the nanoseconds value.
+
+Assuming at the start the threshold the HPET is run for is EQUAL to its known Frequency.
+RDTSC Val x (HPET Frequency)/(TSC Ticks) x (1 Ghz ns)/(HPET Frequency). You see how the HPET frequency gets cancelled out?
+so our magic ratio just becomes (1 GHz ns)/(TSC Ticks). So in theory, the conversion could happen just by multiplying the RDTSC Value with this ratio.
 
 This adventure also confirms that `clock_gettime` is slower than `rdtsc` and `rdtscp` because it is literally a function that CALLS `rdtscp` AND does some extra conversion and storing work. (Quite interesting to note, however, that this approach was still considered more efficient than going out to Y and getting its value and converting that to a time value instead, though I EXPECT the granularity had a role to play here as well.)
 
