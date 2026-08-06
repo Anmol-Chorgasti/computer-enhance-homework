@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "haversine_fun.c"
 #include "profiler/inst_profiler.c"
+#include <sys/mman.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -42,6 +43,7 @@ void FlushBuffer(){
 }
 
 s64 IsValid (char Value){
+    TimeFunction;
     if (Value == ASCII_DOT) return 0;
     if (Value == ASCII_MINUS ) return 1;
     if (Value == ASCII_PLUS) return 2;
@@ -57,6 +59,7 @@ void PrintPair(struct Pairs *HPtr){
 }
 
 void* RequestMemory(size_t Size){
+    TimeFunction;
     void *ptr;
     ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
     if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
@@ -64,6 +67,7 @@ void* RequestMemory(size_t Size){
 }
 
 void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
+    TimeFunction;
     struct stat st;
     if( fstat(FD, &st) < 0 )
         ExitProg("failed to get size of file");
@@ -87,6 +91,7 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
 
 /* Part of test harness */
 s64 IsEqual(f64 Val1, f64 Val2){
+    TimeFunction;
     if(Val1 == Val2) return 1;
     if (Val2 > Val1){
         f64 T = Val2;
@@ -98,7 +103,7 @@ s64 IsEqual(f64 Val1, f64 Val2){
 }
 
 f64 GetDouble (char **Current, char *Limit){
-
+    TimeFunction;
     char Value = *(*Current);
     s32 Type = IsValid(Value);
     if (Type == -1){
@@ -150,6 +155,7 @@ f64 GetDouble (char **Current, char *Limit){
 
 
 s32 ParseBuffer(struct Pairs *HPtr){
+    TimeFunction;
     char *Current = JsonBuffer;
     char *Limit = Current + BufferBytes;
 
@@ -229,6 +235,7 @@ void TestDistances(char *Oracle, f64 *PD, f64 Benchmark){
 }
 
 f64 Rand(s32 Min, s32 Max){
+    TimeFunction;
     f64 Base = (1.0 * rand())/RAND_MAX;
     Base *= (Max - Min);
     Base += Min;
@@ -262,9 +269,10 @@ int main(s32 Argc, char **Argv)
     f64 Sum = 0; f64 Den = sqrt((f64)TENMILL);
 
     /* start timer for mmap and file open here */
+    
+        
     {
-        TimeBlock("Mem Alloc and File Load");
-
+        TimeBlock("Load File and MemAlloc");
         JsonFD = open(Argv[1], O_RDONLY);
         if(JsonFD == -1){
             printf("%s ", Argv[1]);
@@ -281,13 +289,13 @@ int main(s32 Argc, char **Argv)
 
         JsonBasePtr = JsonPtr;
         BuffPtr = JsonBuffer;
-    }  
-
-
+    }
+        
+    
     {
-         /* Start Parse timer here */
-        TimeBlock("Parser");
-         // initial push of JsonPtr
+        TimeBlock("Parse Block");
+
+            // initial push of JsonPtr
         while(*JsonPtr != '[') JsonPtr += 1;
         while(*JsonPtr != '{' && JsonPtr < (JsonBasePtr + JsonSize)) 
             JsonPtr += 1;
@@ -322,6 +330,8 @@ int main(s32 Argc, char **Argv)
             }
         }
     }
+    
+    
    
 
     // Test if 10million pairs parsed
@@ -331,8 +341,9 @@ int main(s32 Argc, char **Argv)
 
     /* Start haversine distance calculation timer here */
    
+    
     {
-        TimeBlock("Haversine Function");
+        TimeBlock("HaversineFunction");
         for(s64 i = 0; i < TENMILL; ++i){
             struct Pairs *HPtr = HP + i;
             *(ParsedDistances + i) = ReferenceHaversine(
@@ -341,7 +352,9 @@ int main(s32 Argc, char **Argv)
                 EarthRadius
             );
         }
-    }
+    }       
+    
+    
    
 
     
@@ -353,6 +366,7 @@ int main(s32 Argc, char **Argv)
         }
         Sum /= Den;
     }
+    
   
 
     // free memory timer here

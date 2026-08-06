@@ -1,0 +1,60 @@
+Compiling Base Parser with GCC...
+Requested Run Time: 2000ms 2.00s
+Approx Actual Run Time: 2000000010ns 2000ms 2.00s
+OS Freq : 1000000000
+CPU Frequency(approx.) : 2994707940, 2.995GHz
+
+====================== Profiler Output =================
+Full Program Time: 9.15 seconds, 9152.56 milliseconds
+---------------------------
+
+ALL TESTS PASSED!
+Benchmark : 31644436.141814872622
+
+Compiling Heavily profiled Parser with GCC...
+Requested Run Time: 2000ms 2.00s
+Approx Actual Run Time: 2000000021ns 2000ms 2.00s
+OS Freq : 1000000000
+CPU Frequency(approx.) : 2994720523, 2.995GHz
+
+====================== Profiler Output =================
+Full Program Time: 24.83 seconds, 24829.86 milliseconds
+---------------------------
+IsValid[995556344] :- 29419966216(excl.) (39.57%)
+RequestMemory[2] :- 475631700(excl.) (0.64%)
+DumpFile[1] :- 2467080(excl.) (0.00%)
+GetDouble[40000000] :- 23404661409(excl.) (31.48%) 43305136410(incl.) (58.24%)
+ParseBuffer[10000000] :- 12048916932(excl.) (16.20%) 64873544557(incl.) (87.24%)
+Load File and MemAlloc[1] :- 43080(excl.) (0.00%) 478141860(incl.) (0.64%)
+Parse Block[1] :- 5875149233(excl.) (7.90%) 70748693790(incl.) (95.15%)
+HaversineFunction[1] :- 2960338710(excl.) (3.98%)
+Benchmark calc[1] :- 83272110(excl.) (0.11%)
+Other[1] :- 88038150(excl.) (0.12%)
+
+ALL TESTS PASSED!
+Benchmark : 31644436.141814872622
+
+Compiling Medium profiled Parser with GCC...
+Requested Run Time: 2000ms 2.00s
+Approx Actual Run Time: 2000000001ns 2000ms 2.00s
+OS Freq : 1000000000
+CPU Frequency(approx.) : 2994707683, 2.995GHz
+
+====================== Profiler Output =================
+Full Program Time: 9.27 seconds, 9265.86 milliseconds
+---------------------------
+Load File and MemAlloc[1] :- 476404290(excl.) (1.72%)
+Parse Block[1] :- 24143429190(excl.) (87.01%)
+HaversineFunction[1] :- 2956279080(excl.) (10.65%)
+Benchmark calc[1] :- 83252460(excl.) (0.30%)
+Free Memory[1] :- 89190630(excl.) (0.32%)
+Other[1] :- 510(excl.) (0.00%)
+
+ALL TESTS PASSED!
+Benchmark : 31644436.141814872622
+
+
+Some thoughts
+1. Parser runtime, including a cold file load from disk is around 9.15 seconds
+2. The heavy profiled results are completely distored, we hit IsValid 1 billion times and GetDouble 40 million times..the overhead inserted from the rdtsc calls and other profiler work has blown up the time to 24 seconds, though the exact mechanics remain unclear to me as of this point
+3. The med profile results seem MORE reliable. The time should be a few miliseconds higher given that the file is most likely already in RAM, and we are not fetching from disk as in base case, so the profiler overhead is likely to be MORE Than the 0.12 seconds shown in this run, however, this is still closer to base run results - and the percentages, seem to match intuition.

@@ -1,9 +1,34 @@
 #include "time_stats.c"
-#include <sys/mman.h>
 #define CPU_FREQ_LIMIT "2"
 #define CPU_FREQ_UNIT "sec"
 #define LIMIT 4096
 
+
+#ifndef PROFILER
+#define PROFILER 0
+#endif
+/*
+    What does that mean?
+    The preprocessor (which happens before compile time) treats this as
+    if Profiler is a defined macro, then - leave it as is
+    but if not? then Define the macro Profiler and replace it with 0
+*/
+
+/*
+    ALl things that need to be included regardless of Profiler value
+*/
+void PrintTime(char *Message, u64 Start, u64 End, u64 TSCF){
+    printf("\n====================== Profiler Output =================\n");
+    printf("%s Time: %.2f seconds, %.2f milliseconds\n", Message, (f64)(End - Start)/(f64)TSCF, 1000 * ((f64)(End - Start)/(f64)TSCF));
+    printf("---------------------------\n");
+}
+
+void ExitProg(char *Message){
+    printf("%s\n", Message);
+    exit(EXIT_FAILURE);
+}
+
+#if PROFILER
 
 struct Anchor {
     const char *Name;
@@ -31,16 +56,7 @@ static struct Profiler Pr; /* Static takes care of zero initialization for all m
 static u32 GlobalParentIdx; /* 0 signals no parent open, Casey style thinking */
 
 
-void ExitProg(char *Message){
-    printf("%s\n", Message);
-    exit(EXIT_FAILURE);
-}
 
-void PrintTime(char *Message, u64 Start, u64 End, u64 TSCF){
-    printf("\n====================== Profiler Output =================\n");
-    printf("%s Time: %.2f seconds, %.2f milliseconds\n", Message, (f64)(End - Start)/(f64)TSCF, 1000 * ((f64)(End - Start)/(f64)TSCF));
-    printf("---------------------------\n");
-}
 
 
 #define BeginProfiler StartProfiler()
@@ -64,7 +80,8 @@ __attribute__((always_inline)) inline static void EndAndPrintProfiler(){
 
     /* PRINT ALL BLOCKS */
     u32 i = 1;
-    while(Pr.Anchors[i].HitCount != 0){
+    for(int i = 0; i < LIMIT; ++i){
+        if(Pr.Anchors[i].HitCount == 0) continue;
         printf(
             "%s[%lu] :- %lu(excl.) (%.2f%%)", Pr.Anchors[i].Name,
             Pr.Anchors[i].HitCount,
@@ -77,8 +94,8 @@ __attribute__((always_inline)) inline static void EndAndPrintProfiler(){
                 100 * ((f64)Pr.Anchors[i].TSCInclusiveElapsed/(f64)MainElapsed)
             );
         }else printf("\n");
-        i++;
     }
+   
 
     printf("Other[1] :- %lu(excl.) (%.2f%%)\n",
         MainElapsed + Others->TSCExclusiveElapsed, 100 * (f64)(MainElapsed + Others->TSCExclusiveElapsed)/(f64)MainElapsed);
@@ -119,7 +136,43 @@ __attribute__ ((always_inline)) inline static void CleanUp(struct FrameDetails *
         GlobalParentIdx = Idx; \
         Fd.CallingTime = ReadCPUTimer(); \
 
-        
+#else
+
+/*
+    If profiler has been killed -
+    still need basic running time of entire program
+    and some dummy thing to replace the timeblock and timefunction calls with
+    so that the compiler does not scream at me
+*/
+
+struct Profiler {
+    u64 StartTSC;
+    u64 EndTSC;
+};
+
+static struct Profiler Pr;
+static u64 TSCFreq;
+
+#define BeginProfiler StartProfiler()
+
+// Initialize Profiler
+__attribute__((always_inline)) inline static void StartProfiler(){
+    TSCFreq = ReadCPUFreq(CPU_FREQ_UNIT, CPU_FREQ_LIMIT);
+    /* What do I need here? */
+    Pr.StartTSC = ReadCPUTimer();
+}
+
+#define EndProfiler EndAndPrintProfiler()
+// Kind of Destroy Profiler 
+__attribute__((always_inline)) inline static void EndAndPrintProfiler(){
+    Pr.EndTSC = ReadCPUTimer();
+    PrintTime("Full Program",Pr.StartTSC, Pr.EndTSC, TSCFreq);
+}
+
+#define TimeBlock(...)
+#define TimeFunction TimeBlock(__func__)
+
+#endif
         
 
 

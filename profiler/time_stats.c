@@ -69,8 +69,8 @@ static u64 GetCPUFreq(f64 RunTime)
 
     /* Print OS & CPU Timer stats */
     printf("OS Freq : %ld\n", (u64)OS_TIMER_FREQ);
-    printf("CPU Start Count : %ld\n", CPUStart);
-    printf("CPU Ends Count : %ld\n", CPUEnd);
+    //printf("CPU Start Count : %ld\n", CPUStart);
+    //printf("CPU Ends Count : %ld\n", CPUEnd);
     printf("CPU Frequency(approx.) : %ld, %.3fGHz\n", CPUFreq, CPUFreq/1e9);
 
     return CPUFreq;
