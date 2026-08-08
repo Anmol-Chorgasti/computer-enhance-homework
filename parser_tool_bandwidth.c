@@ -45,7 +45,7 @@ void FlushBuffer(){
 }
 
 s64 IsValid (char Value){
-    TimeFunction;
+    //TimeFunction;
     if (Value == ASCII_DOT) return 0;
     if (Value == ASCII_MINUS ) return 1;
     if (Value == ASCII_PLUS) return 2;
@@ -61,7 +61,7 @@ void PrintPair(struct Pairs *HPtr){
 }
 
 void* RequestMemory(size_t Size){
-    TimeFunction;
+    //TimeFunction;
     void *ptr;
     ptr =  mmap(NULL, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
     if(ptr == MAP_FAILED) ExitProg("Memory allocation failed");
@@ -69,7 +69,7 @@ void* RequestMemory(size_t Size){
 }
 
 void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
-    TimeFunction;
+    //TimeFunction;
     struct stat st;
     if( fstat(FD, &st) < 0 )
         ExitProg("failed to get size of file");
@@ -81,7 +81,11 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
         ExitProg("Empty file forces termination of program.");
 
     void *Ptr = NULL;
-    Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED | MAP_POPULATE, FD, 0);
+    {
+        TimeBandwidth("File load (Mmap Populate)", *SizePtr);
+        Ptr = mmap(NULL, *SizePtr, PROT_READ, MAP_SHARED | MAP_POPULATE, FD, 0);
+    }
+    
 
     if (Ptr == MAP_FAILED){
         printf("%s...", FileName);
@@ -93,7 +97,7 @@ void *DumpFile (s32 FD, char *FileName, s64 *SizePtr){
 
 /* Part of test harness */
 s64 IsEqual(f64 Val1, f64 Val2){
-    TimeFunction;
+    //TimeFunction;
     if(Val1 == Val2) return 1;
     if (Val2 > Val1){
         f64 T = Val2;
@@ -105,7 +109,7 @@ s64 IsEqual(f64 Val1, f64 Val2){
 }
 
 f64 GetDouble (char **Current, char *Limit){
-    TimeFunction;
+    //TimeFunction;
     char Value = *(*Current);
     s32 Type = IsValid(Value);
     if (Type == -1){
@@ -157,7 +161,7 @@ f64 GetDouble (char **Current, char *Limit){
 
 
 s32 ParseBuffer(struct Pairs *HPtr){
-    TimeFunction;
+    //TimeFunction;
     char *Current = JsonBuffer;
     char *Limit = Current + BufferBytes;
 
@@ -237,7 +241,7 @@ void TestDistances(char *Oracle, f64 *PD, f64 Benchmark){
 }
 
 f64 Rand(s32 Min, s32 Max){
-    TimeFunction;
+    //TimeFunction;
     f64 Base = (1.0 * rand())/RAND_MAX;
     Base *= (Max - Min);
     Base += Min;
@@ -274,7 +278,7 @@ int main(s32 Argc, char **Argv)
     
         
     {
-        TimeBlock("Load File and MemAlloc");
+        TimeBlock("Memory Allocation");
         JsonFD = open(Argv[1], O_RDONLY);
         if(JsonFD == -1){
             printf("%s ", Argv[1]);
@@ -284,6 +288,7 @@ int main(s32 Argc, char **Argv)
         close(JsonFD);
 
         /* Start struct memory request timer here */
+        
         HP = (struct Pairs *)RequestMemory(sizeof(struct Pairs)*TENMILL);
         HPLimit = HP + TENMILL; //One past the last valid mem addr.
         ParsedDistances = (f64 *)RequestMemory(sizeof(f64)*TENMILL);
@@ -291,11 +296,13 @@ int main(s32 Argc, char **Argv)
 
         JsonBasePtr = JsonPtr;
         BuffPtr = JsonBuffer;
+    
+        
     }
         
     
     {
-        TimeBlock("Parse Block");
+        TimeBandwidth("Parse Block", JsonSize);
 
             // initial push of JsonPtr
         while(*JsonPtr != '[') JsonPtr += 1;
@@ -311,6 +318,7 @@ int main(s32 Argc, char **Argv)
             }
             JsonPtr += 1;
             BufferBytes += 1; //to include the last }
+            JsonBuffer[BufferBytes] = '\0'; //null termination safety + 0 indexing
             memcpy(BuffPtr, JsonPtr-BufferBytes+1, BufferBytes);
 
             // Parse buffer
@@ -345,7 +353,7 @@ int main(s32 Argc, char **Argv)
    
     
     {
-        TimeBlock("HaversineFunction");
+        TimeBandwidth("HaversineFunction", sizeof(struct Pairs)*TENMILL);
         for(s64 i = 0; i < TENMILL; ++i){
             struct Pairs *HPtr = HP + i;
             *(ParsedDistances + i) = ReferenceHaversine(
@@ -371,12 +379,16 @@ int main(s32 Argc, char **Argv)
     
   
 
+    {
+        TimeBlock("Free Memory");
+        munmap(JsonBasePtr, JsonSize);
+        munmap(HP, sizeof(struct Pairs)*TENMILL);
+        if(Argc == 2) munmap(ParsedDistances, sizeof(f64)*TENMILL);
+        JsonPtr = NULL, JsonBasePtr = NULL;
+        HPLimit = NULL, PDLimit = NULL;
+    }
     // free memory timer here
-    munmap(JsonBasePtr, JsonSize);
-    munmap(HP, sizeof(struct Pairs)*TENMILL);
-    if(Argc == 2) munmap(ParsedDistances, sizeof(f64)*TENMILL);
-    JsonPtr = NULL, JsonBasePtr = NULL;
-    HPLimit = NULL, PDLimit = NULL;
+   
    
     /* End program timer here! */
     EndProfiler;

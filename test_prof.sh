@@ -21,15 +21,9 @@ build/havgen $RANDOM 10000000
 
 echo "Compiling Base Parser with GCC..."
 gcc -g parser_tool_baseprof.c -o build/basep -lm
-
 build/basep build/input.json build/results.bin
 
-echo "Compiling Heavily profiled Parser with GCC..."
-gcc -g parser_tool_heavyprof.c -o build/heavyp -lm
-
-build/heavyp build/input.json build/results.bin
-
 echo "Compiling Medium profiled Parser with GCC..."
-gcc -g parser_tool_medprof.c -o build/medp -lm
-build/medp build/input.json build/results.bin
+gcc -g parser_tool_bandwidth.c -o build/ptb -lm
+build/ptb build/input.json build/results.bin
 

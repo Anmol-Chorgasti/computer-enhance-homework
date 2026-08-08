@@ -34,7 +34,8 @@ struct Anchor {
     const char *Name;
     u64 TSCExclusiveElapsed;
     u64 TSCInclusiveElapsed;
-    u64 HitCount;  
+    u64 HitCount; 
+    u64 BytesProcessed;
 };
 
 
@@ -55,10 +56,6 @@ struct FrameDetails {
 static struct Profiler Pr; /* Static takes care of zero initialization for all members of Pr */
 static u32 GlobalParentIdx; /* 0 signals no parent open, Casey style thinking */
 
-
-
-
-
 #define BeginProfiler StartProfiler()
 
 // Initialize Profiler
@@ -68,18 +65,8 @@ __attribute__((always_inline)) inline static void StartProfiler(){
     Pr.StartTime = ReadCPUTimer();
 }
 
-#define EndProfiler EndAndPrintProfiler()
-// Kind of Destroy Profiler 
-__attribute__((always_inline)) inline static void EndAndPrintProfiler(){
-
-    Pr.EndTime = ReadCPUTimer();
-    struct Anchor *Others = &Pr.Anchors[0];
-
-    u64 MainElapsed = Pr.EndTime - Pr.StartTime;
-    PrintTime("Full Program",Pr.StartTime, Pr.EndTime, Pr.TSCFreq); // prints entire running time of program
-
+void PrintAnchors(u64 MainElapsed){
     /* PRINT ALL BLOCKS */
-    u32 i = 1;
     for(int i = 0; i < LIMIT; ++i){
         if(Pr.Anchors[i].HitCount == 0) continue;
         printf(
@@ -89,16 +76,43 @@ __attribute__((always_inline)) inline static void EndAndPrintProfiler(){
             100 * ((f64)Pr.Anchors[i].TSCExclusiveElapsed/(f64)MainElapsed)
         );
         if(Pr.Anchors[i].TSCExclusiveElapsed != Pr.Anchors[i].TSCInclusiveElapsed){
-            printf(" %lu(incl.) (%.2f%%)\n",
+            printf(" %lu(incl.) (%.2f%%)",
                 Pr.Anchors[i].TSCInclusiveElapsed,
                 100 * ((f64)Pr.Anchors[i].TSCInclusiveElapsed/(f64)MainElapsed)
             );
-        }else printf("\n");
+        }
+        printf("\n");
     }
    
-
+    struct Anchor *Others = &Pr.Anchors[0];
     printf("Other[1] :- %lu(excl.) (%.2f%%)\n",
         MainElapsed + Others->TSCExclusiveElapsed, 100 * (f64)(MainElapsed + Others->TSCExclusiveElapsed)/(f64)MainElapsed);
+}
+
+void PrintBandwidths(void){
+    for(int i = 0; i < LIMIT; ++i){
+
+        if(Pr.Anchors[i].BytesProcessed){
+            f64 MegaBytes = (f64)(Pr.Anchors[i].BytesProcessed)/(f64)(1024 * 1024);
+            f64 GigaBytes = MegaBytes/1024.0;
+            f64 Throughput = (f64)(GigaBytes * Pr.TSCFreq)/(f64)Pr.Anchors[i].TSCInclusiveElapsed;
+            printf("%s Bandwidth: %.3f MB, %.2f GB/s\n",Pr.Anchors[i].Name, MegaBytes, Throughput);
+        }
+    }
+}
+
+
+#define EndProfiler EndAndPrintProfiler()
+// Kind of Destroy Profiler 
+__attribute__((always_inline)) inline static void EndAndPrintProfiler(){
+
+    Pr.EndTime = ReadCPUTimer();
+    
+
+    u64 MainElapsed = Pr.EndTime - Pr.StartTime;
+    PrintTime("Full Program",Pr.StartTime, Pr.EndTime, Pr.TSCFreq); // prints entire running time of program
+    PrintAnchors(MainElapsed);
+    PrintBandwidths();
 }
 
 
@@ -122,10 +136,11 @@ __attribute__ ((always_inline)) inline static void CleanUp(struct FrameDetails *
    
 }
 
-#define TimeFunction TimeSection(__func__, __COUNTER__+1)
-#define TimeBlock(BlockName) TimeSection(BlockName, __COUNTER__+1)
+#define TimeFunction TimeSection(__func__, __COUNTER__+1, 0)
+#define TimeBlock(BlockName) TimeSection(BlockName, __COUNTER__+1, 0)
+#define TimeBandwidth(BlockName, Data) TimeSection(BlockName, __COUNTER__ + 1, Data)
 
-#define TimeSection(BlockName, Idx) \
+#define TimeSection(BlockName, Idx, Data) \
         struct FrameDetails Fd __attribute__((cleanup(CleanUp))); \
         Fd.AnchorIdx = Idx; \
         Fd.CallingParent = GlobalParentIdx; \
@@ -133,6 +148,7 @@ __attribute__ ((always_inline)) inline static void CleanUp(struct FrameDetails *
         Fd.OldTscInclusive = A->TSCInclusiveElapsed; \
         A->Name = BlockName; \
         A->HitCount++; \
+        A->BytesProcessed = Data; \
         GlobalParentIdx = Idx; \
         Fd.CallingTime = ReadCPUTimer(); \
 
@@ -171,6 +187,7 @@ __attribute__((always_inline)) inline static void EndAndPrintProfiler(){
 
 #define TimeBlock(...)
 #define TimeFunction TimeBlock(__func__)
+#define TimeBandwidth(BlockName, Data) TimeBlock(BlockName, Data)
 
 #endif
         
