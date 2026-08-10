@@ -1,0 +1,58 @@
+
+Parser Results
+
+Compiling with Clang...
+Compiling with GCC...
+Build successful!
+Executing Parser...
+10000000
+Parse succeeded
+Parsed Bench : 31650232.326376810670
+Expected Bench : 31650232.326376806945
+
+
+Block Profiler Results
+
+ompiling with Clang...
+Compiling with GCC...
+Build successful!
+Executing generator...
+Seed used: 6aad
+Statistical Bench Mark : 31653584.366059962660
+Compiling Base Parser with GCC...
+Requested Run Time: 2000ms 2.00s
+Approx Actual Run Time: 2000000029ns 2000ms 2.00s
+OS Freq : 1000000000
+CPU Frequency(approx.) : 2994526426, 2.995GHz
+
+====================== Profiler Output =================
+Full Program Time: 9.19 seconds, 9192.32 milliseconds
+---------------------------
+
+ALL TESTS PASSED!
+Benchmark : 31653584.366059966385
+
+Compiling Medium profiled Parser with GCC...
+Requested Run Time: 2000ms 2.00s
+Approx Actual Run Time: 2000000009ns 2000ms 2.00s
+OS Freq : 1000000000
+CPU Frequency(approx.) : 2994527461, 2.995GHz
+
+====================== Profiler Output =================
+Full Program Time: 9.22 seconds, 9217.35 milliseconds
+---------------------------
+File load (Mmap Populate)[1] :- 2644350(excl.) (0.01%)
+Memory Allocation[1] :- 479958240(excl.) (1.74%) 482602590(incl.) (1.75%)
+Parse Block[1] :- 23986310190(excl.) (86.90%)
+HaversineFunction[1] :- 2955981810(excl.) (10.71%)
+Benchmark calc[1] :- 83205270(excl.) (0.30%)
+Free Memory[1] :- 93506010(excl.) (0.34%)
+Other[1] :- 1260(excl.) (0.00%)
+File load (Mmap Populate) Bandwidth: 882.684 MB, 976.15 GB/s
+Parse Block Bandwidth: 882.684 MB, 0.11 GB/s
+HaversineFunction Bandwidth: 305.176 MB, 0.30 GB/s
+
+ALL TESTS PASSED!
+Benchmark : 31653584.366059966385
+
+

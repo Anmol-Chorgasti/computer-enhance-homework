@@ -1,6 +1,5 @@
 
-#include <fcntl.h>
-#include <unistd.h>
+
 
 
 // Filename to open and memory location to read into
@@ -16,6 +15,7 @@ static void ReadWithFread(repetition_tester *Tester, read_params *Param){
     while(IsTesting(Tester)){
         FILE *F = fopen(Param->FileName, "rb");
         if(F){
+            EvictFileFromCache(fileno(F));
             buffer Dptr = Param->Dest;   
             BeginTime(Tester);
             size_t Result = fread(Dptr.Data, Dptr.Count, 1, F);
@@ -53,8 +53,9 @@ static void ReadWithFread(repetition_tester *Tester, read_params *Param){
 static void ReadWithSysRead(repetition_tester *Tester, read_params *Param){
     
     while(IsTesting(Tester)){
-        b32 Fd = open(Param->FileName, O_RDONLY);
+        int Fd = open(Param->FileName, O_RDONLY);
         if(Fd != -1){
+            EvictFileFromCache(Fd);
             buffer Dptr = Param->Dest;
             u64 BytesToRead = Dptr.Count;
             u64 BufferLoc = 0;
@@ -77,8 +78,32 @@ static void ReadWithSysRead(repetition_tester *Tester, read_params *Param){
             close(Fd);     
         }
         else{
-            fprintf(stderr, "Unable to open file with fopen\n");
+            fprintf(stderr, "Unable to open file with sys open\n");
         }    
     }
 
 }
+
+
+static void ReadWithMmapPop(repetition_tester *Tester, read_params *Param){
+
+    while(IsTesting(Tester)){
+        int Fd = open(Param->FileName, O_RDONLY);
+        if(Fd != -1){
+            EvictFileFromCache(Fd);
+            BeginTime(Tester);
+            Param->Dest.Data = (u8*)mmap(NULL, Param->Dest.Count, PROT_READ, MAP_PRIVATE | MAP_FILE | MAP_POPULATE, Fd, 0);
+            EndTime(Tester);
+
+            if(Param->Dest.Data != MAP_FAILED){
+                CountBytes(Tester, Param->Dest.Count);
+            }else{
+                Error(Tester, "Unable to read file with fread");
+            }
+
+            UnmapBuffer(&Param->Dest);
+            close(Fd);
+        }else fprintf(stderr, "Unable to open file with sys open\n");
+    }
+}
+

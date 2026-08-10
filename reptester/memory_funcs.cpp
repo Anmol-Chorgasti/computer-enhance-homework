@@ -69,3 +69,42 @@ static void UnmapBuffer(buffer *B){
         }
     }
 }
+
+static buffer HandleAllocation(u32 i, u64 size){
+    
+    switch(i){
+        case 1:
+            printf("Preallocation using Malloc\n");
+            return AllocateMallocBuffer(size);
+        case 2:
+            printf("Preallocation using Mmap\n");
+            return AllocateBuffer(size);
+        default:
+            fprintf(stderr, "Unmatched case\n");
+            return {};
+    }
+}
+
+static void HandleDeallocation(u32 i, buffer *B){
+    switch(i){
+        case 1:
+            return FreeBuffer(B);
+        case 2:
+            return UnmapBuffer(B);
+        default:
+            fprintf(stderr, "Unmatched case\n");
+            return;
+    }
+}
+
+static void EvictFileFromCache(int Fd){
+    if(Fd != -1){
+        fdatasync(Fd);
+
+        b32 Result = posix_fadvise(Fd, 0,0,POSIX_FADV_DONTNEED);
+        if(Result){
+            fprintf(stderr, "Eviction failed\n");
+        }
+
+    }else fprintf(stderr, "Invalid File Descriptor\n");
+}

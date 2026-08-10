@@ -114,7 +114,7 @@ static void InitializeTester(repetition_tester *Tester ,u64 CPUFreq, u64 TargetB
         Tester->CPUTimerFreq = CPUFreq;
         Tester->TargetProcessedByteCount = TargetBytesCount;
         Tester->TestStatus = TestMode_Testing;
-        Tester->PrintNewMins = true;
+        Tester->PrintNewMins = false;
         Tester->Results.MinTime = (u64)-1;
     }
     else if(Tester->TestStatus == TestMode_Completed){
